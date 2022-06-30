@@ -6,8 +6,6 @@ import "./NonblockingLzApp.sol";
 import "./IOFTCore.sol";
 import "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
 
-import "hardhat/console.sol";
-
 /// @title OFTCore
 /// @author Forked from https://github.com/LayerZero-Labs/solidity-examples/blob/main/contracts/token/oft/OFTCore.sol
 /// but with slight modifications from the Angle Core Team which added return values to the `_creditTo` and `_debitFrom` functions
@@ -45,6 +43,11 @@ abstract contract OFTCore is NonblockingLzApp, ERC165Upgradeable, IOFTCore {
 
         uint64 nonce = lzEndpoint.getOutboundNonce(_dstChainId, address(this));
         emit SendToChain(msg.sender, _dstChainId, _toAddress, _amount, nonce);
+    }
+
+    /// @inheritdoc IOFTCore
+    function withdraw(uint256 amount, address recipient) external virtual returns (uint256) {
+        return amount;
     }
 
     // ============================= Internal Functions ===================================

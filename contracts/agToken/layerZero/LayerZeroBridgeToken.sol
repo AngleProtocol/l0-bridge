@@ -65,6 +65,14 @@ contract LayerZeroBridgeToken is OFTCore, ERC20Upgradeable, PausableUpgradeable 
         send(_dstChainId, _toAddress, _amount, _refundAddress, _zroPaymentAddress, _adapterParams);
     }
 
+    /// @inheritdoc OFTCore
+    function withdraw(uint256 amount, address recipient) external override whenNotPaused returns (uint256) {
+        // Does not check allowances as transfers from `msg.sender`
+        _transfer(msg.sender, address(this), amount);
+        amount = canonicalToken.swapIn(address(this), amount, recipient);
+        return amount;
+    }
+
     // ============================= Internal Functions ===================================
 
     /// @inheritdoc OFTCore
