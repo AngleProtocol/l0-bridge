@@ -8,9 +8,9 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title AgTokenSideChainMultiBridge
 /// @author Angle Core Team
-/// @notice Contract for Angle agTokens to be deployed on other chains than Ethereum mainnet
+/// @notice Contract for Angle agTokens on other chains than Ethereum mainnet
 /// @dev This contract supports bridge tokens having a minting right on the stablecoin (also referred to as the canonical
-/// token)
+/// or the native token)
 /// @dev References:
 ///      - FRAX implementation: https://polygonscan.com/address/0x45c32fA6DF82ead1e2EF74d17b76547EDdFaFF89#code
 ///      - QiDAO implementation: https://snowtrace.io/address/0x5c49b268c9841AFF1Cc3B0a418ff5c3442eE3F3b#code
@@ -62,6 +62,7 @@ contract AgTokenSideChainMultiBridge is BaseAgTokenSideChain {
     // =============================== Errors ================================
 
     error AssetStillControlledInReserves();
+    error HourlyLimitExceeded();
     error InvalidToken();
     error NotGovernor();
     error NotGovernorOrGuardian();
@@ -129,6 +130,7 @@ contract AgTokenSideChainMultiBridge is BaseAgTokenSideChain {
         uint256 balance = IERC20(bridgeToken).balanceOf(address(this));
         if (balance + amount > bridgeDetails.limit) {
             // In case someone maliciously sends tokens to this contract
+            // Or the limit changes
             if (bridgeDetails.limit > balance) amount = bridgeDetails.limit - balance;
             else {
                 amount = 0;
@@ -138,7 +140,14 @@ contract AgTokenSideChainMultiBridge is BaseAgTokenSideChain {
         // Checking requirement on the hourly volume
         uint256 hour = block.timestamp / 3600;
         uint256 hourlyUsage = usage[bridgeToken][hour] + amount;
-        if (hourlyUsage > bridgeDetails.hourlyLimit) amount = bridgeDetails.hourlyLimit - usage[bridgeToken][hour];
+        if (hourlyUsage > bridgeDetails.hourlyLimit) {
+            // Edge case when the hourly limit changes
+            if (bridgeDetails.hourlyLimit > usage[bridgeToken][hour])
+                amount = bridgeDetails.hourlyLimit - usage[bridgeToken][hour];
+            else {
+                amount = 0;
+            }
+        }
         usage[bridgeToken][hour] = usage[bridgeToken][hour] + amount;
 
         IERC20(bridgeToken).safeTransferFrom(msg.sender, address(this), amount);

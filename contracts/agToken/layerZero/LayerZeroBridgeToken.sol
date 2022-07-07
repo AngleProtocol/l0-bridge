@@ -66,11 +66,14 @@ contract LayerZeroBridgeToken is OFTCore, ERC20Upgradeable, PausableUpgradeable 
     }
 
     /// @inheritdoc OFTCore
-    function withdraw(uint256 amount, address recipient) external override whenNotPaused returns (uint256) {
+    function withdraw(uint256 amount, address recipient) external override returns (uint256 amountMinted) {
         // Does not check allowances as transfers from `msg.sender`
         _transfer(msg.sender, address(this), amount);
-        amount = canonicalToken.swapIn(address(this), amount, recipient);
-        return amount;
+        amountMinted = canonicalToken.swapIn(address(this), amount, recipient);
+        uint256 leftover = balanceOf(address(this));
+        if (leftover > 0) {
+            _transfer(address(this), msg.sender, leftover);
+        }
     }
 
     // ============================= Internal Functions ===================================
@@ -80,14 +83,23 @@ contract LayerZeroBridgeToken is OFTCore, ERC20Upgradeable, PausableUpgradeable 
         uint16,
         bytes memory,
         uint256 _amount
-    ) internal override whenNotPaused returns (uint256) {
+    ) internal override whenNotPaused returns (uint256 amountSwapped) {
         // No need to use safeTransferFrom as we know this implementation reverts on failure
         canonicalToken.transferFrom(msg.sender, address(this), _amount);
 
         // Swap canonical for this bridge token. There may be some fees
-        uint256 amountSwapped = canonicalToken.swapOut(address(this), _amount, address(this));
+        amountSwapped = canonicalToken.swapOut(address(this), _amount, address(this));
         _burn(address(this), amountSwapped);
-        return amountSwapped;
+    }
+
+    /// @inheritdoc OFTCore
+    function _debitCreditFrom(
+        uint16,
+        bytes memory,
+        uint256 _amount
+    ) internal override whenNotPaused returns (uint256) {
+        _burn(msg.sender, _amount);
+        return _amount;
     }
 
     /// @inheritdoc OFTCore
@@ -95,11 +107,13 @@ contract LayerZeroBridgeToken is OFTCore, ERC20Upgradeable, PausableUpgradeable 
         uint16,
         address _toAddress,
         uint256 _amount
-    ) internal override whenNotPaused returns (uint256) {
+    ) internal override whenNotPaused returns (uint256 amountMinted) {
         _mint(address(this), _amount);
-        uint256 amountMinted = canonicalToken.swapIn(address(this), _amount, _toAddress);
-        transfer(_toAddress, balanceOf(address(this)));
-        return amountMinted;
+        amountMinted = canonicalToken.swapIn(address(this), _amount, _toAddress);
+        uint256 leftover = balanceOf(address(this));
+        if (leftover > 0) {
+            _transfer(address(this), _toAddress, leftover);
+        }
     }
 
     // ======================= View Functions ================================
